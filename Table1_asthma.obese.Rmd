@@ -1,0 +1,75 @@
+---
+title: "HCHS/SOL GOLD Table1"
+author: "MS"
+date: "8/26/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(comment = NA)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(tableone)
+library(magrittr)
+# remove.packages("xfun")
+```
+
+## The HCHS/SOL cohort with WGS
+
+This file has Table 1 characteristics for the study cohort by asthma/obesity status.
+
+
+```{r , include=F}
+load( file='/Users/maggie/Documents/BIPM/BioDataCatalyst/Data/BDC-SOL-GOLD-0424.RData')
+
+
+```
+
+
+
+
+```{r , include=F}
+
+
+listVar.gold<- c( 'age_v1_v2',"gender_v1_v2", 'background_5',  'relocation_age', 'generation2','education_v1_v2','income_v1_v2','bmi_v1_v2', 'bmi_cat_v1_v2',"smoker.current.v1.v2","asthma.current.obese", "asthma.child.onset12" , 'prs.std.wang')
+catVars.gold <- c("gender_v1_v2", 'background_5',  'generation2','education_v1_v2','income_v1_v2', 'bmi_cat_v1_v2',"smoker.current.v1.v2",
+                            "asthma.current.obese", "asthma.child.onset12" )
+ 
+labels.gold<- c( 'Current asthma','Age',"Sex", 'National background', 'Immigration age',
+                 'Generation','Education','Income', 'BMI',
+                'BMI category', 'Current smoker',      'Asthma/obesity', 'Child onset asthma','Asthma PRS')
+
+table1.vars.gold<- dplyr::select(gold,asthma.current,one_of(listVar.gold))
+labelled::var_label(table1.vars.gold) <-labels.gold
+
+table1.gold.strat.na <-CreateTableOne(vars = listVar.gold, data = table1.vars.gold, factorVars = catVars.gold, includeNA=T, strata='asthma.current.obese', addOverall = T)
+
+table1.gold.strat <-CreateTableOne(vars = listVar.gold, data = table1.vars.gold, factorVars = catVars.gold, includeNA=F, strata='asthma.current.obese', addOverall = T)
+```
+
+## Gold Participants 
+
+### Without NAs
+
+
+```{r , echo=F}           
+table1.gold.strat.na
+ table1.gold.strat
+ 
+```
+
+
+```{r , echo=F}           
+kableone(print(table1.gold.strat,  catDigits = 1, contDigits = 1, varLabels = T))
+
+```
+
+### With NAs
+
+```{r , echo=F}    
+
+kableone(print(table1.gold.strat.na,  catDigits = 1, contDigits = 1, varLabels = T))
+```
+
