@@ -1,0 +1,97 @@
+---
+title: "Plot asthma prevalence"
+author: "MS"
+date: "10/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(cowplot)
+```
+
+## Asthma prevalence varies widely by ethnic background
+
+
+```{r , include=F}
+load( file='/Users/maggie/Documents/BIPM/BioDataCatalyst/Data/BDC-SOL-GOLD-0424.RData')
+
+
+```
+
+```{r cars}
+
+pcts<- prop.table(table(gold$asthma.current, gold$background_5), 2)
+pcts.long<- reshape2::melt(pcts)
+
+pcts.all<- data.frame(pcts.long[pcts.long$Var1==1,])%>%
+  dplyr::rename(Background=Var2)%>%
+  mutate(Background=factor(Background,lev=c("Overall",'Mexican','Puerto Rican','Cuban','Dominican','Other'), labels=c("Overall",'Mexican','Puerto Rican','Cuban','Dominican','Other')))
+
+
+
+```
+
+
+```{r }
+
+
+(p.asthma.current<- ggplot(pcts.all, aes( y = (value*100), x = Background, fill='grey50')) + 
+  geom_bar(position = "dodge", stat="identity") +
+  ylab('Asthma prevalence (%)') +ylim(c(0,25))+
+    scale_fill_manual( values=c( '#cb181d'))+
+  xlab('')+theme_bw()+ theme(axis.title=element_text(size=15),legend.position='none', strip.text.x = element_text(size = 15),text = element_text(size = 15)))
+
+
+```
+
+## obesity prevalene overall
+
+
+```{r cars}
+
+asthma.sub<- gold%>%
+  dplyr::filter(asthma.current==1)
+pcts.ob<- prop.table(table(gold$obese, gold$background_5), 2)
+pcts.ob.all<- data.frame(All=prop.table(table(gold$obese)))
+pcts.ob.all2<- cbind(pcts.ob, Overall=pcts.ob.all$All.Freq)
+
+pcts.ob.a<- prop.table(table(asthma.sub$obese, asthma.sub$background_5), 2)
+pcts.ob.a.all<- data.frame(All=prop.table(table(asthma.sub$obese)))
+pcts.ob.a.all2<- cbind(pcts.ob.a, Overall=pcts.ob.a.all$All.Freq)
+
+
+pcts.fig2<- reshape2::melt(pcts.ob.all2) %>%
+  mutate(Population='All') %>%
+  bind_rows(reshape2::melt(pcts.ob.a.all2) %>% mutate(Population='Asthmatics'))%>%
+  dplyr::filter(Var1==1) %>%
+  dplyr::rename(Background=Var2)%>%
+  mutate(Background=factor(Background, lev=c("Overall",'Mexican','Puerto Rican','Cuban','Dominican','Other')))
+  
+```
+
+
+
+```{r }
+
+(p.asthma.obese<- ggplot(pcts.fig2, aes( y = (value*100), x = Background, fill=Population)) + 
+  geom_bar(position = "dodge", stat="identity") +
+  ylab('Obesity prevalence (%)') +ylim(c(0,100))+
+    scale_fill_manual( values=c( '#67a9cf','#b2182b'))+
+  xlab('')+theme_bw()+ theme(axis.title=element_text(size=15),strip.text.x = element_text(size = 15),text = element_text(size = 15)))
+```
+
+
+
+```{r , echo=FALSE}
+
+both.plot<- plot_grid(p.asthma.current,p.asthma.obese,  ncol=2 ,align='vh',  
+  labels = c("A", "B"), rel_widths = c(1,1.3))
+
+both.plot
+
+
+```
