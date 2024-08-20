@@ -1,23 +1,11 @@
 ---
 title: "Plot asthma prevalence"
 author: "MS"
-date: "10/7/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F)
-library(ggplot2)
-library(dplyr)
-library(data.table)
-library(cowplot)
-```
-
-## Asthma prevalence varies widely by ethnic background
-
-
 ```{r , include=F}
-load( file='/Users/maggie/Documents/BIPM/BioDataCatalyst/Data/BDC-SOL-GOLD-0424.RData')
+load( file='BDC-SOL-GOLD-0424.RData')
 
 
 ```
