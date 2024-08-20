@@ -1,7 +1,6 @@
 ---
 title: "HCHS/SOL GOLD Table1"
 author: "MS"
-date: "8/26/2021"
 output: word_document
 ---
 
@@ -22,7 +21,7 @@ This file has Table 1 characteristics for the study cohort by asthma/obesity sta
 
 
 ```{r , include=F}
-load( file='/Users/maggie/Documents/BIPM/BioDataCatalyst/Data/BDC-SOL-GOLD-0424.RData')
+load( file='BDC-SOL-GOLD-0424.RData')
 
 
 ```
@@ -72,4 +71,5 @@ kableone(print(table1.gold.strat,  catDigits = 1, contDigits = 1, varLabels = T)
 
 kableone(print(table1.gold.strat.na,  catDigits = 1, contDigits = 1, varLabels = T))
 ```
+
 
