@@ -1,5 +1,5 @@
 This repository has the code for the paper:
-Relationships among host genetics, gut microbiota, asthma, and obesity in US Hispanic/Latino adults
+Relationships among host genetics, gut microbiota, asthma, and obesity in US Hispanic/Latino adults.
 
 **Data access**
 
