@@ -1,0 +1,428 @@
+---
+title: "Parsimonious model of genetics/microbiome risk scores"
+author: "MS"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(comment =  NA)
+library(dplyr)
+library(data.table)
+library(foreign)
+library(nnet)
+
+library(car)
+library(tidyr)
+library(tidyverse)
+library(haven)
+library(tibble)
+library(readr)
+library(purrr)
+library(tidystats)
+library(pscl)
+library(DescTools)
+library(bigstatsr)
+```
+
+
+```{r , include=FALSE}
+
+
+
+load( file='Data.test.GMscores.RData')
+
+
+source('Functions_for_Regs_Taxa_gm_LASSO_PRS.R')
+
+```
+
+## Levels of covariate adjustment
+
+## Minimally adjusted models
+
+
+### The plan
+I think we want to build the model up from most basic to most complex.  The plot would have different facets for Model 1-3, and different line color for omic measure (i think) - PRS, alpha, taxa.  
+Ethan thinks the most basic model starts with age, sex, PCs, but from GM perspective, we are interested in what genetics adds to GM data.  So I think will do it both ways.
+
+Here are the steps:
+0. covs
+1. covs, omic
+2. covs,  omic, PRS
+
+Here are the steps for the starting with PCs (pc):
+0. covs
+1. covs, PRS
+2. covs,  omic, PRS
+
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.all'
+covs.m1<- c('male','AGE_GOLD','income','education', 'relocation_age', 'other', 'Dominican', 'Cuban', 'PuertoRican', 'generation','smoker.current.v1.v2', 'PC1', 'PC2','PC3','PC4','PC5')
+step.overall<- steps.func(ancom.selbal.g.test, m1.otu, covs=covs.m1, ancom.selbal.g.test$asthma.current)
+
+
+overall.res<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1,covs=covs.m1,  ancom.selbal.g.test$asthma.current)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.g.test, m1.otu, covs=covs.m1, outcome=ancom.selbal.g.test$asthma.current)
+
+
+overall.pc.res<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1,covs=covs.m1, ancom.selbal.g.test$asthma.current)
+
+ 
+```
+
+
+```{r , echo=FALSE}
+
+overall.res
+overall.pc.res
+
+overall.res$p.add.gm
+overall.pc.res$p.add.gm
+
+overall.res$p.add.prs
+overall.pc.res$p.add.prs
+
+```
+
+
+
+
+
+## Levels of covariate adjustment
+Set 1: gender_v1_v2 ,AGE_GOLD, smoking 
+Set 2: gender_v1_v2 ,AGE_GOLD,  income,education_v1_v2  , smoking
+Set 3: gender_v1_v2 ,AGE_GOLD,  income,education_v1_v2, relocation_age, background, generation , smoking  
+
+## Minimally adjusted models
+
+
+### The plan
+I think we want to build the model up from most basic to most complex.  
+Ethan thinks the most basic model starts with age, sex, PCs, but from GM perspective, we are also interested in what genetics adds to GM data.  So I think will do it both ways.
+
+Here are the steps:
+0. age, sex, smoking, PCS
+1. age, sex,  smoking, omic
+2. age, sex, smoking,  omic, PRS, PCs
+
+Here are the steps for the starting with PCs (pc):
+0. age, sex, PCs
+1. age, sex, PCs, PRS
+2. age, sex, PCs, PRS, omic
+
+
+```{r , echo=FALSE}
+
+  
+m1.otu<- 'score.all'
+# m1.otu<- unique(c(tax.sp.asthma.cur$ANCOM.OTU, tax.sp.asthma.cur$LASSO))
+step.overall.sp<- steps.func(ancom.selbal.sp.test, m1.otu,covs=covs.m1, ancom.selbal.sp.test$asthma.current)
+
+
+overall.res.sp<- combine.res(m1.otu,
+                               step.overall.sp$Step0.m1, step.overall.sp$Step1.m1, step.overall.sp$Step2.m1, covs=covs.m1, ancom.selbal.sp.test$asthma.current)
+
+
+step.pc.overall.sp<- steps.pc.func(ancom.selbal.sp.test, m1.otu,covs=covs.m1, ancom.selbal.sp.test$asthma.current)
+
+overall.pc.res.sp<- combine.res.pc(m1.otu,step.pc.overall.sp$Step0.m1, step.pc.overall.sp$Step1.m1,step.pc.overall.sp$Step2.m1, covs=covs.m1,  ancom.selbal.sp.test$asthma.current)
+
+ 
+```
+
+
+```{r , echo=FALSE}
+
+overall.res.sp
+overall.pc.res.sp
+
+overall.res.sp$p.add.gm
+overall.pc.res.sp$p.add.gm
+
+overall.res.sp$p.add.prs
+overall.pc.res.sp$p.add.prs
+```
+
+```{r , echo=FALSE}
+
+
+ancom.selbal.OA<- ancom.selbal.g.test[ancom.selbal.g.test$asthma.current.obese %in% c('Obese asthma', 'Neither')]
+ancom.selbal.As<- ancom.selbal.g.test[ancom.selbal.g.test$asthma.current.obese %in% c('Asthma only', 'Neither')]
+ancom.selbal.Ob<- ancom.selbal.g.test[ancom.selbal.g.test$asthma.current.obese %in% c('Obese only', 'Neither')]
+
+
+
+```
+
+
+
+## Obese asthma 
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.OA'
+
+step.overall<- steps.func(ancom.selbal.OA, m1.otu,covs=covs.m1, ancom.selbal.OA$asthma.current)
+
+overall.res.OA<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1, covs=covs.m1,ancom.selbal.OA$asthma.current)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.OA, m1.otu, covs=covs.m1,ancom.selbal.OA$asthma.current)
+
+overall.pc.res.OA<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1, covs=covs.m1, ancom.selbal.OA$asthma.current)
+
+```
+
+
+```{r , echo=FALSE}
+
+overall.res.OA
+overall.pc.res.OA
+rm(m1.otu)
+
+```
+
+
+## Obese only
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.Ob'
+
+step.overall<- steps.func(ancom.selbal.Ob, m1.otu,covs=covs.m1,  ancom.selbal.Ob$obese)
+
+overall.res.Ob<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1, covs=covs.m1, ancom.selbal.Ob$obese)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.Ob, m1.otu,covs=covs.m1, ancom.selbal.Ob$obese)
+
+overall.pc.res.Ob<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1, covs=covs.m1, ancom.selbal.Ob$obese)
+
+```
+
+
+```{r , echo=FALSE}
+
+overall.res.Ob
+overall.pc.res.Ob
+rm(  m1.otu)
+overall.res.Ob$p.add.gm
+overall.pc.res.Ob$p.add.gm
+
+```
+
+
+## Asthma only
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.As'
+
+step.overall<- steps.func(ancom.selbal.As, m1.otu,covs=covs.m1, ancom.selbal.As$asthma.current)
+
+
+overall.res.As<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1, covs=covs.m1,ancom.selbal.As$asthma.current)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.As, m1.otu,covs=covs.m1, ancom.selbal.As$asthma.current)
+
+overall.pc.res.As<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1, covs=covs.m1, ancom.selbal.As$asthma.current)
+
+```
+
+
+```{r , echo=FALSE}
+
+overall.res.As
+overall.pc.res.As
+# rm(m1.otu)
+
+overall.res.As$p.add.gm
+overall.pc.res.As$p.add.gm
+
+overall.res.As$p.add.prs
+overall.pc.res.As$p.add.prs
+
+```
+# Species
+
+
+```{r , echo=FALSE}
+ancom.selbal.sp.OA<- ancom.selbal.sp.test[ancom.selbal.sp.test$asthma.current.obese %in% c('Obese asthma', 'Neither')]
+ancom.selbal.sp.As<- ancom.selbal.sp.test[ancom.selbal.sp.test$asthma.current.obese %in% c('Asthma only', 'Neither')]
+ancom.selbal.sp.Ob<- ancom.selbal.sp.test[ancom.selbal.sp.test$asthma.current.obese %in% c('Obese only', 'Neither')]
+```
+
+## Obese asthma
+
+```{r , echo=FALSE}
+
+
+m1.otu<- 'score.OA'
+
+step.overall<- steps.func(ancom.selbal.sp.OA, m1.otu,covs=covs.m1, ancom.selbal.sp.OA$asthma.current)
+
+
+overall.res.sp.OA<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1, covs=covs.m1, ancom.selbal.sp.OA$asthma.current)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.sp.OA, m1.otu, covs=covs.m1, ancom.selbal.sp.OA$asthma.current)
+
+overall.pc.res.sp.OA<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1, covs=covs.m1, ancom.selbal.sp.OA$asthma.current)
+# summary(glm(asthma.current~OTU114+ AGE_GOLD+gender_v1_v2, data=ancom.selbal.sp.OA,family='binomial'))
+
+```
+
+
+```{r , echo=FALSE}
+rm(step.pc.overall, step.overall, m1.otu)
+overall.res.sp.OA
+overall.pc.res.sp.OA
+
+
+overall.res.sp.OA$p.add.gm
+overall.pc.res.sp.OA$p.add.gm
+
+
+overall.res.sp.OA$p.add.prs
+overall.pc.res.sp.OA$p.add.prs
+```
+
+
+## Obese only
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.Ob'
+
+step.overall<- steps.func(ancom.selbal.sp.Ob, m1.otu, covs=covs.m1,ancom.selbal.sp.Ob$obese)
+
+
+overall.res.sp.Ob<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1,covs=covs.m1,  ancom.selbal.sp.Ob$obese)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.sp.Ob, m1.otu,  covs=covs.m1,ancom.selbal.sp.Ob$obese)
+
+overall.pc.res.sp.Ob<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1,covs=covs.m1 , ancom.selbal.sp.Ob$obese)
+# summary(glm(asthma.current~OTU114+ AGE_GOLD+gender_v1_v2, data=ancom.selbal.sp.Ob,family='binomial'))
+
+```
+
+
+```{r , echo=FALSE}
+rm(step.pc.overall, step.overall, m1.otu)
+overall.res.sp.Ob
+overall.pc.res.sp.Ob
+
+
+overall.res.sp.Ob$p.add.gm
+overall.pc.res.sp.Ob$p.add.gm
+
+overall.res.sp.Ob$p.add.prs
+overall.pc.res.sp.Ob$p.add.prs
+```
+
+
+## Asthma only
+
+```{r , echo=FALSE}
+
+m1.otu<- 'score.As'
+
+step.overall<- steps.func(ancom.selbal.sp.As, m1.otu, covs=covs.m1, ancom.selbal.sp.As$asthma.current)
+
+
+overall.res.sp.As<- combine.res( m1.otu,step.overall$Step0.m1, step.overall$Step1.m1, step.overall$Step2.m1,covs=covs.m1, ancom.selbal.sp.As$asthma.current)
+
+
+
+step.pc.overall<- steps.pc.func(ancom.selbal.sp.As, m1.otu, covs=covs.m1, ancom.selbal.sp.As$asthma.current)
+
+overall.pc.res.sp.As<- combine.res.pc(m1.otu,step.pc.overall$Step0.m1, step.pc.overall$Step1.m1, step.pc.overall$Step2.m1, covs=covs.m1, ancom.selbal.sp.As$asthma.current)
+# summary(glm(asthma.current~OTU114+ AGE_GOLD+gender_v1_v2, data=ancom.selbal.sp.As,family='binomial'))
+
+```
+
+
+```{r , echo=FALSE}
+rm(step.pc.overall, step.overall, m1.otu)
+overall.res.sp.As
+overall.pc.res.sp.As
+overall.res.sp.As$p.add.gm
+overall.pc.res.sp.As$p.add.gm
+
+overall.res.sp.As$p.add.prs
+overall.pc.res.sp.As$p.add.prs
+```
+
+```{r , echo=FALSE}
+
+
+model.compare.gm<- overall.pc.res.sp %>%
+  mutate(level='Species', Outcome='Current') %>%
+  bind_rows(overall.pc.res %>%
+  mutate(level='Genus', Outcome='Current') )%>%
+  bind_rows(overall.pc.res.sp.As %>%
+  mutate(level='Species', Outcome='Asthma only' ))%>%
+ bind_rows(overall.pc.res.sp.Ob %>%
+  mutate(level='Species', Outcome='Obesity only' ))%>%
+  bind_rows(overall.pc.res.sp.OA %>%
+  mutate(level='Species', Outcome='Obese asthma') )%>%
+  bind_rows(overall.pc.res.As %>%
+  mutate(level='Genus', Outcome='Asthma only' ))%>%
+  bind_rows(overall.pc.res.Ob %>%
+  mutate(level='Genus', Outcome='Obesity only' ))%>%
+  bind_rows(overall.pc.res.OA %>%
+  mutate(level='Genus', Outcome='Obese asthma') )%>%
+  arrange(level, Outcome)
+
+model.compare.gm$p.add.gm
+
+model.compare.prs<- overall.res.sp %>%
+  mutate(level='Species', Outcome='Current') %>%
+  bind_rows(overall.res %>%
+  mutate(level='Genus', Outcome='Current') )%>%
+  bind_rows(overall.res.sp.As %>%
+  mutate(level='Species', Outcome='Asthma only' ))%>%
+ bind_rows(overall.res.sp.Ob %>%
+  mutate(level='Species', Outcome='Obesity only' ))%>%
+  bind_rows(overall.res.sp.OA %>%
+  mutate(level='Species', Outcome='Obese asthma') )%>%
+  bind_rows(overall.res.As %>%
+  mutate(level='Genus', Outcome='Asthma only' ))%>%
+  bind_rows(overall.res.Ob %>%
+  mutate(level='Genus', Outcome='Obesity only' ))%>%
+  bind_rows(overall.res.OA %>%
+  mutate(level='Genus', Outcome='Obese asthma') )
+
+model.compare.prs
+
+```
+
+
+```{r , echo=FALSE}
+
+
+save(model.compare.gm,model.compare.prs,
+     file='ModelCompare_R2_GMPRS_score_test_M3.RData')
+
+
+```
+
+
+
+
+
+
+

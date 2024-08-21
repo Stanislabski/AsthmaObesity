@@ -1,0 +1,392 @@
+---
+title: "LASSO to predict microbial predictors of asthma"
+author: "MS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(plyr)
+library(dplyr)
+library(knitr)
+library(grid)
+library(ggplot2)
+library(gridExtra)
+library(tibble)
+library(selbal)
+library(zCompositions)
+library(phyloseq)
+library(microbiome) 
+library(glmnet)
+```
+
+
+
+```{r , echo=F}
+
+load(file='data.test.ancom.selbal.cur.sp.M3.RData') 
+
+load( file='data.test.ancom.selbal.cur.M3.0523.RData') 
+
+
+
+load(file='data.train.ancom.selbal.cur.sp.M3.RData') 
+
+load( file='data.train.ancom.selbal.cur.M3.RData') 
+```
+
+### Get the LASSO predictions in the training set, then apply in the testing set
+
+
+
+```{r , echo=F}
+
+OA<- ancom.selbal.g.train.std[ancom.selbal.g.train.std$asthma.current.obese %in% c('Obese asthma', 'Neither')]
+As<- ancom.selbal.g.train.std[ancom.selbal.g.train.std$asthma.current.obese %in% c('Asthma only', 'Neither')]
+Ob<- ancom.selbal.g.train.std[ancom.selbal.g.train.std$asthma.current.obese %in% c('Obese only', 'Neither')]
+
+
+
+
+
+
+```
+
+
+  
+  
+
+
+
+```{r , echo=F}     
+covs.all<- c('male','AGE_GOLD','income','education', 'relocation_age', 'other', 'Dominican', 'Cuban', 'PuertoRican', 'generation','smoker.current.v1.v2')
+
+d.all<- ancom.selbal.g.train.std%>% 
+  dplyr::select(one_of(covs.all),starts_with('OTU') , starts_with('g.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.OA<- OA %>% 
+  dplyr::select( one_of(covs.all),starts_with('OTU') , starts_with('g.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.Ob<- Ob %>% 
+  dplyr::select( one_of(covs.all),starts_with('OTU') , starts_with('g.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.As<- As %>% 
+  dplyr::select(one_of(covs.all), starts_with('OTU') , starts_with('g.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+test.all<- ancom.selbal.g.test.std %>%
+  dplyr::select(one_of(names(d.all)), one_of(covs.all))
+
+test.OA<- ancom.selbal.g.test.std %>%
+  dplyr::select(one_of(names(d.OA)), one_of(covs.all))
+
+
+test.As<- ancom.selbal.g.test.std %>%
+  dplyr::select(one_of(names(d.As)), one_of(covs.all)) 
+
+test.Ob<- ancom.selbal.g.test.std %>%
+  dplyr::select(one_of(names(d.Ob)), one_of(covs.all)) 
+
+```
+
+```{r , echo=F}     
+
+outcome<- ancom.selbal.g.train.std$asthma.current
+
+# table(ancom.selbal.g.train.std$asthma.current)
+ penalty.factor.all=c(  rep(0, length(covs.all)),rep(1, (ncol(d.all)-length(covs.all))))
+
+  cv_model.all<- cv.glmnet(as.matrix(d.all), outcome, alpha = 1, family='binomial')
+  best_model.all <- glmnet(as.matrix(d.all), outcome, alpha = 1, lambda =  cv_model.all$lambda.1se, family='binomial')
+  coef.tokeep.all<- coef(best_model.all)[,1]!=0
+  names(coef.tokeep.all[coef.tokeep.all==T])[-1]
+  
+  tokeep.all.g<-  setdiff( names(coef.tokeep.all[coef.tokeep.all==T])[-1],covs.all)
+  tokeep.all.g
+
+
+```
+
+
+
+```{r , echo=F}   
+outcome<- OA$asthma.current
+
+  cv_model.OA <- cv.glmnet(as.matrix(d.OA), outcome, alpha = 1, family='binomial', penalty.factor=penalty.factor.all)
+   best_model.OA <- glmnet(as.matrix(d.OA), outcome, alpha = 1, lambda =  cv_model.OA$lambda.1se, family='binomial')
+   coef.tokeep.OA<- coef(best_model.OA)[,1]!=0
+   tokeep.OA.g<- setdiff( names(coef.tokeep.OA[coef.tokeep.OA==T])[-1],covs.all)
+   
+ names(coef.tokeep.OA[coef.tokeep.OA==T])[-1]
+ 
+    tokeep.OA.g
+  
+  
+```
+
+
+
+
+```{r , echo=F}     
+ 
+outcome<- As$asthma.current
+# length(penalty.factor.As)
+# dim(d.As)
+  cv_model.As <- cv.glmnet(as.matrix(d.As), outcome, alpha = 1, family='binomial')
+  best_model.As <- glmnet(as.matrix(d.As), outcome, alpha = 1, lambda =  cv_model.As$lambda.1se, family='binomial')
+  coef.tokeep.As<- coef(best_model.As)[,1]!=0
+  tokeep.As.g<-  setdiff( names(coef.tokeep.As[coef.tokeep.As==T])[-1],covs.all)
+  
+ names(coef.tokeep.As[coef.tokeep.As==T])[-1]
+    
+tokeep.As.g
+# summary(glm(outcome~.,data= d.As,family='binomial'))
+```
+
+
+
+```{r , echo=F}     
+  outcome<- Ob$obese
+
+  cv_model.Ob <- cv.glmnet(as.matrix(d.Ob), outcome, alpha = 1, family='binomial' , penalty.factor=penalty.factor.all)
+  best_model.Ob <- glmnet(as.matrix(d.Ob), outcome, alpha = 1, lambda =  cv_model.Ob$lambda.1se, family='binomial')
+  coef.tokeep.Ob<- coef(best_model.Ob)[,1]!=0
+  tokeep.Ob.g<- setdiff( names(coef.tokeep.Ob[coef.tokeep.Ob==T])[-1],covs.all)
+  
+   names(coef.tokeep.Ob[coef.tokeep.Ob==T])[-1]
+    
+
+tokeep.Ob.g
+```
+
+```{r}
+  # hist(glm_test_all)
+  #   hist(glm_test_all)
+## I think the link scale for the predictions (rather than the reponse, aka probablities) makes more sense here and is more comparable to a PRS - might also standardize since we did that with PRS.
+# best_model.test<- best_model.all
+# best_model.test$beta[1:3]<- 0
+# best_model.Ob$lambda
+# cv_model.Ob$lambda.1se
+
+best_model.all$beta[1:11]<- 0
+best_model.OA$beta[1:11]<- 0
+best_model.As$beta[1:11]<- 0
+best_model.Ob$beta[1:11]<- 0
+
+glm_test_all <- predict(best_model.all, s = cv_model.all$lambda.1se, newx =as.matrix(test.all))
+
+
+# glm_test_test <- predict(best_model.test, s = cv_model.all$lambda.1se, newx =as.matrix(test.all))
+# table(glm_test_test==glm_test_all)
+
+
+tokeep.all.g
+
+
+glm_test_OA <- predict(best_model.OA, s = cv_model.OA$lambda.1se, newx =as.matrix(test.OA))
+tokeep.OA.g
+
+
+glm_test_As <- predict(best_model.As, s = cv_model.As$lambda.1se, newx =as.matrix(test.As))
+tokeep.As.g
+
+
+glm_test_Ob <- predict(best_model.Ob, s = cv_model.Ob$lambda.1se, newx =as.matrix(test.Ob))
+tokeep.Ob.g
+
+
+(auc.all<- pROC::auc(ancom.selbal.g.test.std$asthma.current, glm_test_all))
+(auc.OA<- pROC::auc(ancom.selbal.g.test.std$asthma.current, glm_test_OA))
+(auc.As<- pROC::auc(ancom.selbal.g.test.std$asthma.current, glm_test_As))
+(auc.Ob<- pROC::auc(ancom.selbal.g.test.std$obese, glm_test_Ob))
+
+```
+
+
+##### Species level results
+
+
+```{r , echo=F}  
+# ls()
+
+
+ toRemove <- c('d.Ob','d.all','d.OA', 'd.As', 
+               'As', 'OA', 'Ob', 
+               "test.all"   , "test.As"   , "test.Ob"   , "test.OA"   )
+  rm(list=c(toRemove))
+```
+
+
+ 
+```{r , echo=F}  
+
+
+OA<- ancom.selbal.sp.train.std[ancom.selbal.sp.train.std$asthma.current.obese %in% c('Obese asthma', 'Neither')]
+As<- ancom.selbal.sp.train.std[ancom.selbal.sp.train.std$asthma.current.obese %in% c('Asthma only', 'Neither')]
+Ob<- ancom.selbal.sp.train.std[ancom.selbal.sp.train.std$asthma.current.obese %in% c('Obese only', 'Neither')]
+
+
+```
+
+
+  
+  
+
+
+
+```{r , echo=F}     
+
+d.all<- ancom.selbal.sp.train.std%>% 
+  dplyr::select(one_of(covs.all), starts_with('OTU') , starts_with('sp.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.OA<- OA %>% 
+  dplyr::select(one_of(covs.all), starts_with('OTU') , starts_with('sp.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.Ob<- Ob %>% 
+  dplyr::select(one_of(covs.all), starts_with('OTU') , starts_with('sp.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+d.As<- As %>% 
+  dplyr::select(one_of(covs.all), starts_with('OTU') , starts_with('sp.selbal'), 'shannon','faith_pd','evenness','observed_features')
+
+
+test.all<- ancom.selbal.sp.test.std %>%
+  dplyr::select(one_of(names(d.all)), one_of(covs.all))
+
+test.OA<- ancom.selbal.sp.test.std %>%
+  dplyr::select(one_of(names(d.OA)), one_of(covs.all))
+
+
+test.As<- ancom.selbal.sp.test.std %>%
+  dplyr::select(one_of(names(d.As)), one_of(covs.all)) 
+
+test.Ob<- ancom.selbal.sp.test.std %>%
+  dplyr::select(one_of(names(d.Ob)), one_of(covs.all)) 
+```
+
+```{r , echo=F}     
+
+outcome<- ancom.selbal.sp.train.std$asthma.current
+# table(ancom.selbal.sp.train.std$asthma.current)
+ penalty.factor.sp=c(  rep(0, length(covs.all)),rep(1, (ncol(d.all)-length(covs.all))))
+
+  cv_sp_model.all<- cv.glmnet(as.matrix(d.all), outcome, alpha = 1, family='binomial')
+  best_model.all.sp <- glmnet(as.matrix(d.all), outcome, alpha = 1, lambda =  cv_sp_model.all$lambda.1se, family='binomial', maxp=9)
+  coef.tokeep.all<- coef(best_model.all.sp)[,1]!=0
+  tokeep.all.sp<-  setdiff( names(coef.tokeep.all[coef.tokeep.all==T])[-1],covs.all)
+   
+tokeep.all.sp
+# summary(glm(outcome~.,data= d.As,family='binomial'))
+```
+
+
+
+```{r , echo=F}   
+outcome<- OA$asthma.current
+
+
+  cv_sp_model.OA <- cv.glmnet(as.matrix(d.OA), outcome, alpha = 1, family='binomial')
+   best_model.OA.sp <- glmnet(as.matrix(d.OA), outcome, alpha = 1, lambda =  cv_sp_model.OA$lambda.1se, family='binomial')
+   coef.tokeep.OA<- coef(best_model.OA.sp)[,1]!=0
+   tokeep.OA.sp<- setdiff( names(coef.tokeep.OA[coef.tokeep.OA==T])[-1],covs.all)
+   
+
+    tokeep.OA.sp
+  
+  
+```
+
+
+
+
+```{r , echo=F}     
+ 
+outcome<- As$asthma.current
+# length(penalty.factor.As)
+# dim(d.As)
+  cv_sp_model.As <- cv.glmnet(as.matrix(d.As), outcome, alpha = 1, family='binomial')
+  best_model.As.sp <- glmnet(as.matrix(d.As), outcome, alpha = 1, lambda =  cv_sp_model.As$lambda.1se, family='binomial')
+  coef.tokeep.As<- coef(best_model.As.sp)[,1]!=0
+  tokeep.As.sp<-  setdiff( names(coef.tokeep.As[coef.tokeep.As==T])[-1],covs.all)
+   
+tokeep.As.sp
+# summary(glm(outcome~.,data= d.As,family='binomial'))
+```
+
+
+
+```{r , echo=F}     
+  outcome<- Ob$obese
+
+  cv_sp_model.Ob <- cv.glmnet(as.matrix(d.Ob), outcome, alpha = 1, family='binomial' )
+  best_model.Ob.sp <- glmnet(as.matrix(d.Ob), outcome, alpha = 1, lambda =  cv_sp_model.Ob$lambda.1se, family='binomial')
+  coef.tokeep.Ob<- coef(best_model.Ob.sp)[,1]!=0
+  tokeep.Ob.sp<- setdiff( names(coef.tokeep.Ob[coef.tokeep.Ob==T])[-1],covs.all)
+  
+  
+
+tokeep.Ob.sp
+```
+
+
+```{r}
+  # hist(glm_test_all)
+  #   hist(glm_test_all)
+## I think the link scale for the predictions (rather than the reponse, aka probablities) makes more sense here and is more comparable to a PRS - might also standardize since we did that with PRS.
+best_model.all.sp$beta[1:11]<- 0
+best_model.OA.sp$beta[1:11]<- 0
+best_model.As.sp$beta[1:11]<- 0
+best_model.Ob.sp$beta[1:11]<- 0
+ 
+
+
+glm_test_all_sp <- predict(best_model.all.sp, s = cv_sp_model.all$lambda.1se, newx =as.matrix(test.all))
+tokeep.all.sp
+
+
+glm_test_OA_sp <- predict(best_model.OA.sp, s = cv_sp_model.OA$lambda.1se, newx =as.matrix(test.OA))
+tokeep.OA.sp
+
+
+glm_test_As_sp <- predict(best_model.As.sp, s = cv_sp_model.As$lambda.1se, newx =as.matrix(test.As))
+tokeep.As.sp
+
+
+glm_test_Ob_sp <- predict(best_model.Ob.sp, s = cv_sp_model.Ob$lambda.1se, newx =as.matrix(test.Ob))
+tokeep.Ob.sp
+
+
+(auc.all.sp<- pROC::auc(ancom.selbal.sp.test.std$asthma.current, glm_test_all_sp))
+(auc.OA.sp<- pROC::auc(ancom.selbal.sp.test.std$asthma.current, glm_test_OA_sp))
+(auc.As.sp<- pROC::auc(ancom.selbal.sp.test.std$asthma.current, glm_test_As_sp))
+(auc.Ob.sp<- pROC::auc(ancom.selbal.sp.test.std$obese, glm_test_Ob_sp))
+```
+
+
+```{r}
+
+ancom.selbal.g.test.std$lasso.all<- glm_test_all
+ancom.selbal.g.test.std$lasso.OA<- glm_test_OA
+ancom.selbal.g.test.std$lasso.As<- glm_test_As
+ancom.selbal.g.test.std$lasso.Ob<- glm_test_Ob
+
+
+
+ancom.selbal.sp.test.std$lasso.all<- glm_test_all_sp
+ancom.selbal.sp.test.std$lasso.OA<- glm_test_OA_sp
+ancom.selbal.sp.test.std$lasso.As<- glm_test_As_sp
+ancom.selbal.sp.test.std$lasso.Ob<- glm_test_Ob_sp
+```
+
+
+```{r , echo=F}
+# ls()
+
+ toRemove <- c("coef.tokeep.As",
+  "ancom.selbal.sp.train.std" ,'d.OA', 'd.As', 'As', 'OA', 'Ob', 'd.Ob',"coef.tokeep.OA"    , "coef.tokeep.all"  ,"coef.tokeep.Ob" ,'toRemove',"outcome"  ,
+               "test.all"   , "test.As"   , "test.Ob"   , "test.OA"   )
+  rm(list=c(toRemove))
+ # ls()
+ 
+save.image( file='lasso.HOLM.M3.ALL.RData')
+
+```
+

@@ -1,0 +1,295 @@
+---
+title: "Regressions of Alpha Diversity Measures"
+author: "MS"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(comment =  NA)
+library(dplyr)
+library(data.table)
+library(foreign)
+library(nnet)
+
+
+library(tidyr)
+library(tidyverse)
+library(haven)
+library(tibble)
+library(readr)
+library(purrr)
+
+```
+
+
+```{r , include=F}
+load( 'BDC-SOL-GOLD-0824.RData')
+
+```
+
+## Levels of covariate adjustment
+Set 1: gender_v1_v2 ,AGE_GOLD  
+Set 2: gender_v1_v2 ,AGE_GOLD, bmi_v1_v2,  income_v1_v2,education  
+Set 3: gender_v1_v2 ,AGE_GOLD, bmi_v1_v2,  income_v1_v2,education, relocation_age, background_5, generation   
+
+## REgression function
+```{r , echo=FALSE}
+
+reg.func<- function(reg.results){
+
+  reg.results %>%
+   map(confint, c( '.x')) ->m1.cis
+  
+m1.cis2<-  as.data.frame(do.call(rbind, m1.cis)) %>%
+    rownames_to_column('alpha')%>%
+  mutate(OR.LCL=exp(`2.5 %`),OR.UCL=exp(`97.5 %`))%>%
+  dplyr::select(-`2.5 %`, -`97.5 %`)
+
+
+reg.results%>%
+  map(summary) %>%
+  map(coef) -> m1.sum
+
+m1.sum2<- as.data.frame(do.call(rbind, m1.sum)) %>%
+  mutate(cov=rep(row.names(m1.sum$shannon_s), 4)) %>%
+    remove_rownames() %>%
+  dplyr::filter(cov=='.x')%>%
+  dplyr::select(-cov)%>%
+  mutate(alpha=names(m1.sum), OR=exp(Estimate))
+results.to.return<- m1.sum2 %>%
+  left_join(m1.cis2 ,
+     by=c('alpha'))%>%
+  mutate( alpha=factor(alpha, lev=c( "observed_features_s",       "evenness_s" ,"shannon_s"   ,         "faith_pd_s"),
+                                                  labels = c("Observed features",       "Evenness" ,"Shannon"   ,         "Faith's PD")))%>%
+  arrange(alpha)%>%
+  dplyr::select(alpha, Estimate, `Std. Error`, `z value`, `Pr(>|z|)`, OR,OR.LCL,OR.UCL)%>%
+  dplyr::rename(SE= `Std. Error`,Z=`z value`, p.value=`Pr(>|z|)`)
+
+return(results.to.return)
+}
+
+```
+
+
+```{r , echo=FALSE}
+
+
+alpha<- c('shannon_s','evenness_s', 'faith_pd_s', 'observed_features_s')
+
+```
+
+
+
+
+```{r , echo=FALSE}
+
+regs.1.current <- alpha.gold %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.gold))
+
+regs.2.current <- alpha.gold %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.gold))
+regs.3.current <- alpha.gold %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.gold))
+
+
+
+
+
+results.1.current<- reg.func(regs.1.current)
+
+results.2.current<- reg.func(regs.2.current)
+
+results.3.current<- reg.func(regs.3.current)
+
+
+```
+
+
+
+
+```{r , echo=FALSE}
+
+
+
+res.regs.current<- data.frame(Model=rep(c(1,2,3), each=4),
+                         covs=rep(c('gender_v1_v2, AGE_GOLD, current smoking','gender_v1_v2, AGE_GOLD, income, education, current smoking','gender_v1_v2, AGE_GOLD, income, education, relocation_age, background_5, generation, current smoking'  ), each=4),
+                         bind_rows(results.1.current,results.2.current,results.3.current )
+  
+)%>%
+  arrange(alpha, Model) %>%
+  mutate(outcome='Current Asthma') 
+
+```
+
+
+
+##OA
+
+```{r , echo=FALSE}
+table(alpha.gold$asthma.current.obese)
+alpha.OA<- alpha.gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither','Obese asthma'))
+regs.1.OA <- alpha.OA%>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.OA))
+
+regs.2.OA <- alpha.OA %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.OA))
+regs.3.OA <- alpha.OA %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.OA))
+
+
+
+
+
+results.1.OA<- reg.func(regs.1.OA)
+
+results.2.OA<- reg.func(regs.2.OA)
+
+results.3.OA<- reg.func(regs.3.OA)
+
+
+```
+
+
+##Obese only
+
+```{r , echo=FALSE}
+table(alpha.gold$asthma.current.obese)
+
+
+alpha.Ob<- alpha.gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither','Obese only'))
+regs.1.Ob <- alpha.Ob%>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.Ob))
+
+regs.2.Ob <- alpha.Ob %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.Ob))
+regs.3.Ob <- alpha.Ob %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.Ob))
+
+
+
+
+
+results.1.Ob<- reg.func(regs.1.Ob)
+
+results.2.Ob<- reg.func(regs.2.Ob)
+
+results.3.Ob<- reg.func(regs.3.Ob)
+
+
+```
+
+
+
+##Asthma only
+
+```{r , echo=FALSE}
+table(alpha.gold$asthma.current.obese)
+
+
+alpha.As<- alpha.gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither','Asthma only'))
+regs.1.As <- alpha.As%>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.As))
+
+regs.2.As <- alpha.As %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.As))
+regs.3.As <- alpha.As %>%
+  dplyr::select(one_of(alpha)) %>%
+  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.As))
+
+
+
+
+
+results.1.As<- reg.func(regs.1.As)
+
+results.2.As<- reg.func(regs.2.As)
+
+results.3.As<- reg.func(regs.3.As)
+
+```
+
+
+```{r , echo=FALSE}
+
+results.As<- results.1.As %>%
+  mutate(Model=1) %>%
+  bind_rows(results.2.As %>%
+  mutate(Model=2) )%>%
+  
+  bind_rows(results.3.As %>%
+  mutate(Model=3) ) %>%
+  mutate(asthma.current.obese='Asthma only') %>%
+  mutate(subset='asthma only & Neither') %>%
+  mutate(n=nrow(alpha.As))
+
+results.Ob<- results.1.Ob %>%
+  mutate(Model=1) %>%
+  bind_rows(results.2.Ob %>%
+  mutate(Model=2) )%>%
+  
+  bind_rows(results.3.Ob %>%
+  mutate(Model=3) ) %>%
+  mutate(asthma.current.obese='Obese only') %>%
+  mutate(subset='Obese only & Neither')%>%
+  mutate(n=nrow(alpha.Ob))
+
+
+
+results.OA<- results.1.OA %>%
+  mutate(Model=1) %>%
+  bind_rows(results.2.OA %>%
+  mutate(Model=2) )%>%
+  bind_rows(results.3.OA %>%
+  mutate(Model=3) ) %>%
+  mutate(asthma.current.obese='Obese asthma') %>%
+  mutate(subset='Obese asthma & Neither')%>%
+  mutate(n=nrow(alpha.OA))
+
+```
+
+
+
+```{r , echo=FALSE}
+
+results.c<- data.frame( bind_rows(results.1.current%>%
+  mutate(Model=1)  ,results.2.current%>%
+  mutate(Model=2)  
+  ,results.3.current%>%
+  mutate(Model=3) )  )%>%
+  arrange(alpha,  Model)%>%
+  mutate(asthma.current.obese='Current Asthma')
+
+
+
+results.multi<- data.frame( bind_rows(results.As,results.OA,results.Ob )
+  
+)%>%
+  arrange(asthma.current.obese, alpha, Model) %>%
+  bind_rows(results.c %>% mutate(n=2404))
+
+
+
+
+```
+
+
+
+
+```{r , echo=FALSE}
+fwrite(results.multi, file='Alpha_asthma_logistic.csv')
+```

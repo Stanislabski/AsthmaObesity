@@ -1,0 +1,103 @@
+---
+title: "Wang prs"
+author: "MS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(dplyr)
+library(tibble)
+library(bigsnpr)
+set.seed(11)
+
+```
+
+
+# Pulling Variants
+
+This code aims to extract the SNPs in the Wang PRS from the topmed data based on the chromosome and position range using PLINK (via WDL, accessed in Terra), and then import the data into R.  
+
+
+### PGS Data
+
+
+Here is the bigsnpr R code.
+
+https://privefl.github.io/bigsnpr/articles/LDpred2.html
+
+This code helps you load in the plink bed/bim/fam files into your R session (and create a backing .bk file that helps with quickly reloading in the data for future sessions).  Then match the SNP effect alleles and index the SNPs to match between the two datasets.  And then finally multiply the genotypes by the weights to get your PRSs.
+
+
+
+
+
+```{r}
+
+library(data.table)
+
+# Read from bed/bim/fam, it generates .bk and .rds files.
+snp_readBed("wang_snps.bed")
+
+# Attach the "bigSNP" object in R session
+obj.bigSNP <- snp_attach("wang_snps.rds")
+# See what the file looks like
+str(obj.bigSNP, max.level = 2, strict.width = "cut")
+# store the genotype matrix
+G   <- obj.bigSNP$genotypes
+# extract the chr, rsid, pos, a1 and a0 info from the bim file
+# obj.bigSNP$map
+map <- setNames(obj.bigSNP$map[-3], c("chr", "rsid", "pos", "a1", "a0"))
+# look at the map (the genotype data that you are validating the weights on)
+
+str(map)
+head(map)
+
+```
+
+
+
+
+```{r}
+# read in the PRS weights file, and subset to the necessary columns.  Rename the columns as necessary. I'm pretty sure a1 refers to the effect allele, and a0 refers to the alternate allele.
+pgs<- fread('PGS001787_hmPOS_GRCh38b.txt') 
+names(pgs)
+
+prsWeights <- pgs %>%
+  dplyr::rename(rsid="rsID" , chr=hm_chr, pos= "hm_pos",
+                "a0"="effect_allele", "a1"="other_allele",
+                beta="effect_weight"  ) %>%
+  dplyr::select(chr, rsid, pos, a0, a1, beta)
+
+## this is really confusing across the literature - is the effect allele the ref allele (a0)?  Or the alternative (a1)?
+# In plink, it seems that plink:5 ALT (effect)/REF (other) according to https://academic-oup-com.proxy.hsl.ucdenver.edu/ije/article/49/5/1734/5900777?login=true
+
+
+# now match the genotype alleles to the PRS weights dataframe
+# note, that this will remove ambiguous atgc SNPs, which is usually good QC anyways
+# join_by_pos = FALSE is a parameter that lets you use rsid instead of pos
+# Values in column $beta are multiplied by -1 for variants with alleles reversed (i.e. swapped)
+
+df_beta <- snp_match(prsWeights, map, strand_flip = TRUE,  join_by_pos = TRUE)
+
+
+pred_prs_scores <- big_prodVec(G, df_beta$beta, ind.col = df_beta[["_NUM_ID_"]])
+wang.scores<- data.frame(sample.ID=obj.bigSNP$fam$sample.ID, 
+                         prs.wang=pred_prs_scores)
+
+
+```
+
+
+
+
+
+```{r , include=FALSE}
+
+save(wang.scores,file= 'PRS_wang.RData')
+```

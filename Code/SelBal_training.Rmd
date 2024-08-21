@@ -1,0 +1,208 @@
+---
+title: "Feature Selection"
+author: "MS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Features Selection Approach
+
+Coda-lasso is computationally efficient and suitable when the focus is the identification of the most associated microbial taxa.
+Selbal stands out when the goal is to obtain a parsimonious model with optimal prediction performance, but it is computationally greedy
+https://malucalle.github.io/Microbiome-Variable-Selection/
+system('git clone https://github.com/UVic-omics/CoDA-Penalized-Regression')
+   https://github.com/malucalle/CoDA-Penalized-Regression
+   
+   
+```{r , echo=F}
+# system('git clone https://github.com/UVic-omics/CoDA-Penalized-Regression')
+# getwd()
+
+```
+
+
+```{r , echo=FALSE}
+# when you have already git clone the repository
+# system('git pull https://github.com/UVic-omics/CoDA-Penalized-Regression')
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r , include=FALSE}
+# devtools::install_github(repo = "malucalle/selbal")
+
+library(knitr) # rbookdown, kable
+library(glmnet) # glmnet
+library(selbal) # selbal
+library(ggplot2) # draw selbal
+library(gridExtra) # grid.arrange
+# library(UpSetR) # upset
+library(ggforce) # selbal-like plot
+library(grid) # grid.draw
+# source coda-lasso functions
+source(file = '~/CoDA-Penalized-Regression/R/functions.R')
+source(file = '~/CoDA-Penalized-Regression/R/functions_coda_penalized_regression.R')
+library(tibble)
+library(dplyr)
+library(data.table)
+library(phyloseq)
+library(microbiome)  
+```
+
+## SelBal
+
+https://evayiwenwang.github.io/Microbiome_variable_selection_tutorial/selbal.html
+
+
+```{r Data Prep, include=FALSE}
+
+load('sp.sub.RData')
+load('BDC-SOL-GOLD-train.RData')
+
+```
+
+
+
+
+
+## SElBal
+
+## Adjustment variables
+
+
+
+```{r , include=T}
+
+covs.3<- dplyr::select(gold,  gender_v1_v2 ,AGE_GOLD,  income,education, relocation_age, background_5, generation,smoker.current.v1.v2 )
+
+
+ 
+```
+
+
+### Adjusted Species level analysis 
+
+
+```{r , echo=FALSE}
+
+
+selbal_sp_cv3<- selbal.cv(x = sp.sub, y = gold$asthma.current,  covar=covs.3,
+                       logit.acc = 'AUC')
+
+```
+
+
+```{r , echo=FALSE}
+save( selbal_sp_cv3,  file='selbal_sp_current_m3.RData')
+
+```
+
+
+
+
+
+
+
+## SElBal
+```{r obese/asthma categories}
+OA<- gold[gold$asthma.current.obese %in% c('Neither','Obese asthma'),]
+As<- gold[gold$asthma.current.obese %in% c('Neither','Asthma only'),]
+Ob<- gold[gold$asthma.current.obese %in% c('Neither','Obese only'),]
+
+sp.sub.OA<- sp.sub %>% dplyr::filter(rownames(.) %in% OA$goldID)
+sp.sub.As<- sp.sub %>% dplyr::filter(rownames(.) %in% As$goldID)
+sp.sub.Ob<- sp.sub %>% dplyr::filter(rownames(.) %in% Ob$goldID)
+
+   
+```
+
+## Adjustment variables
+
+### Adjusted Species level analysis 
+
+
+#### Obese Asthma
+
+```{r Data Prep, include=T}
+
+
+covs.3<- dplyr::select(OA,  gender_v1_v2 ,AGE_GOLD,  income,education, relocation_age, background_5, generation,smoker.current.v1.v2 )
+
+(start<- Sys.time())
+
+
+# 
+(total<- Sys.time()-start)
+
+selbal_OA_cv3<- selbal.cv(x = sp.sub.OA, y = OA$asthma.current,  covar=covs.3,
+                        logit.acc = 'AUC')
+#  # The optimal number of variables is: 2 
+# 
+
+(total<- Sys.time()-start)
+
+```
+
+
+
+
+#### Asthma only
+
+```{r Data Prep, include=T}
+
+covs.3<- dplyr::select(As,  gender_v1_v2 ,AGE_GOLD,  income,education, relocation_age, background_5, generation,smoker.current.v1.v2 )
+
+
+
+
+```
+
+
+
+```{r M3, include=T}
+
+
+selbal_As_cv3<- selbal.cv(x = sp.sub.As, y = As$asthma.current,  covar=covs.3,
+                        logit.acc = 'AUC')
+#  # The optimal number of variables is: 2 
+# 
+
+(total<- Sys.time()-start)
+
+```
+
+
+
+#### Obese only
+
+```{r , include=T}
+
+covs.3<- dplyr::select(Ob,  gender_v1_v2 ,AGE_GOLD,  income,education, relocation_age, background_5, generation,smoker.current.v1.v2 )
+
+
+# 
+
+selbal_Ob_cv3<- selbal.cv(x = sp.sub.Ob, y = Ob$obese,  covar=covs.3,
+                        logit.acc = 'AUC')
+
+(total<- Sys.time()-start)
+
+
+```
+
+
+
+
+
+```{r , echo=FALSE}
+
+
+save(  selbal_Ob_cv3, 
+      selbal_As_cv3, 
+      selbal_OA_cv3, 
+     file='selbal_sp_multi_current_cv_train_m3.RData')
+
+```

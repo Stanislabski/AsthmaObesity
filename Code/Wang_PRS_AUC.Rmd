@@ -1,0 +1,237 @@
+---
+title: "PRS AUC"
+author: "MS"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(stringr)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(tibble)
+
+```
+
+
+# Pulling Variants
+
+This code aims to extract the SNPs in the Wang PRS from the topmed data based on the chromosome and position range using PLINK (in Terra), and then import the data into R.  
+
+
+## Read in the chromosome data to R
+
+You can read in data with various different functions, eg read.table, read.csv, etc.  Fread is from the data.table package and tends to be fairly "smart" at figuring out if your data has headers, etc.  But it's always good to open the dataset and check that it looks okay.
+
+
+### PGS Data
+
+
+
+
+
+
+```{r}
+
+load(file= 'BDC-GOLD-PRS-Wang-0424.RData')
+
+```
+
+
+
+
+```{r , eacho=FALSE}
+gold$prs.std.wang
+
+gold$asthma.current.obese <- relevel(gold$asthma.current.obese, ref = "Neither")
+gold$prs.q<-  ntile(gold$prs.std.wang, 4)
+gold$prs.q<- factor(gold$prs.q)
+
+gold$prs.q.pred<-  ntile(gold$prs.std, 4)
+gold$prs.q.pred<- factor(gold$prs.q.pred)
+
+oa<- gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither', 'Obese asthma'))
+ob<- gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither', 'Obese only'))
+as<- gold %>%
+  dplyr::filter(asthma.current.obese %in% c('Neither', 'Asthma only'))
+
+```
+
+```{r , include=FALSE}
+
+regs.0 <-   glm(asthma.current~prs.std.wang, family='binomial', data=gold)
+regs.0t <-   glm(asthma.current~prs.std, family='binomial', data=gold)
+ci.0<- confint(regs.0)
+ci.0t<- confint(regs.0t)
+
+
+(auc0<- predict(regs.0, type='response') %>%
+    bigstatsr ::AUCBoot( gold$asthma.current ))
+(auc0t<- predict(regs.0t, type='response') %>%
+    bigstatsr ::AUCBoot( gold$asthma.current ))
+
+
+
+regs.oa <-   glm(asthma.current~prs.std.wang, family='binomial', data=oa)
+regs.ob <-   glm(obese~prs.std.wang, family='binomial', data=ob)
+regs.as <-   glm(asthma.current~prs.std.wang, family='binomial', data=as)
+ci.oa<- confint(regs.oa)
+ci.ob<- confint(regs.ob)
+ci.as<- confint(regs.as)
+
+
+(auc.oa<- predict(regs.oa, type='response') %>%
+    bigstatsr ::AUCBoot( oa$asthma.current ))
+(auc.ob<- predict(regs.ob, type='response') %>%
+    bigstatsr ::AUCBoot( ob$obese ))
+(auc.as<- predict(regs.as, type='response') %>%
+    bigstatsr ::AUCBoot( as$asthma.current ))
+
+
+regs.oat <-   glm(asthma.current~prs.std, family='binomial', data=oa)
+regs.obt <-   glm(obese~prs.std, family='binomial', data=ob)
+regs.ast <-   glm(asthma.current~prs.std, family='binomial', data=as)
+
+(auc.oat<- predict(regs.oat, type='response') %>%
+    bigstatsr ::AUCBoot( oa$asthma.current ))
+(auc.obt<- predict(regs.obt, type='response') %>%
+    bigstatsr ::AUCBoot( ob$obese ))
+(auc.ast<- predict(regs.ast, type='response') %>%
+    bigstatsr ::AUCBoot( as$asthma.current ))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+res.auc0<- bind_rows(auc0, auc.oa,auc.as, auc.ob) %>%
+         mutate(Outcome=c('Current asthma', 'Obese asthma','Asthma only', 'Obese only'))%>%
+dplyr::rename(AUC='Mean', AUC.LCL='2.5%', AUC.UCL='97.5%')
+
+res.auc0
+
+res.auct<- bind_rows(auc0t, auc.oat,auc.ast, auc.obt) %>%
+         mutate(Outcome=c('Current asthma', 'Obese asthma','Asthma only', 'Obese only'))%>%
+dplyr::rename(AUC='Mean', AUC.LCL='2.5%', AUC.UCL='97.5%')
+res.auct
+
+```
+
+
+
+
+```{r , echo=FALSE}
+
+
+regs.q <-   glm(asthma.current~prs.q, family='binomial', data=gold)
+regs.q.oa <-   glm(asthma.current~prs.q, family='binomial', data=oa)
+regs.q.as <-   glm(asthma.current~prs.q, family='binomial', data=as)
+regs.q.ob <-   glm(obese~prs.q, family='binomial', data=ob)
+# table(as$prs.q, as$asthma.current)
+# table(oa$prs.q, oa$asthma.current)
+
+regs.q.t <-   glm(asthma.current~prs.q.pred, family='binomial', data=gold)
+regs.q.oa.t <-   glm(asthma.current~prs.q.pred, family='binomial', data=oa)
+regs.q.as.t <-   glm(asthma.current~prs.q.pred, family='binomial', data=as)
+regs.q.ob.t <-   glm(obese~prs.q.pred, family='binomial', data=ob)
+
+
+
+summary(regs.q.as)$coef[4,]
+summary(regs.q.oa)$coef[4,]
+summary(regs.q.ob)$coef[4,]
+summary(regs.q)$coef[4,]
+
+exp(summary(regs.q.as)$coef[4,1])
+exp(summary(regs.q.oa)$coef[4,1])
+exp(summary(regs.q.ob)$coef[4,1])
+exp(summary(regs.q)$coef[4,1])
+
+
+summary(regs.q.as.t)$coef[4,]
+summary(regs.q.oa.t)$coef[4,]
+summary(regs.q.ob.t)$coef[4,]
+summary(regs.q.t)$coef[4,]
+```
+
+```{r , echo=FALSE}
+
+regs.est.q<- broom::tidy(regs.q) %>%
+  dplyr::filter(term== 'prs.q4')%>%
+  mutate(Outcome='Current asthma')%>%
+  left_join((    data.frame(confint(regs.q) )%>%
+    rownames_to_column(., 'term') %>%
+      dplyr::filter(term== 'prs.q4')),
+    by='term'
+  )%>%
+  bind_rows(
+  broom::tidy(regs.q.oa) %>%
+  dplyr::filter(term== 'prs.q4')%>%
+  mutate(Outcome='Obese asthma')%>%
+  left_join((    data.frame(confint(regs.q.oa) )%>%
+    rownames_to_column(., 'term') %>%
+      dplyr::filter(term== 'prs.q4')),
+    by='term'
+  ))%>%
+  bind_rows(
+  broom::tidy(regs.q.as) %>%
+  dplyr::filter(term== 'prs.q4')%>%
+  mutate(Outcome='Asthma only')%>%
+  left_join((    data.frame(confint(regs.q.as) )%>%
+    rownames_to_column(., 'term') %>%
+      dplyr::filter(term== 'prs.q4')),
+    by='term'
+  ))%>%
+  bind_rows(
+  broom::tidy(regs.q.ob) %>%
+  dplyr::filter(term==  'prs.q4')%>%
+  mutate(Outcome='Obese only')%>%
+  left_join((    data.frame(confint(regs.q.ob) )%>%
+    rownames_to_column(., 'term') %>%
+      dplyr::filter(term== 'prs.q4')),
+    by='term'
+  ))%>%
+  mutate(OR=exp(estimate), OR.LCL=exp(X2.5..), OR.UCL=exp(X97.5..))%>%
+  dplyr::rename( "LCL"=X2.5..,"UCL" = X97.5..) %>%
+  relocate(Outcome)
+regs.est.q
+names(regs.est.q)[3:11]<- paste('q4.',names(regs.est.q)[3:11], 
+                                sep='')
+
+```
+
+
+```{r , eacho=FALSE}
+
+res.auc.all<- res.auc0 %>%
+  left_join(regs.est.q, by='Outcome')%>%
+  relocate(Outcome, AUC,AUC.LCL,
+AUC.UCL,q4.OR,q4.OR.LCL,q4.OR.UCL)
+res.auc.all
+
+
+```
+
+
+
+```{r , include=FALSE}
+
+save(res.auc.all,file= 'AUC_PRS_wang_0424.RData')
+```
