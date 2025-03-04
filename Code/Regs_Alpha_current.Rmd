@@ -28,46 +28,47 @@ load( 'BDC-SOL-GOLD-0824.RData')
 
 ```
 
-## Levels of covariate adjustment
-Set 1: gender_v1_v2 ,AGE_GOLD  
-Set 2: gender_v1_v2 ,AGE_GOLD, bmi_v1_v2,  income_v1_v2,education  
-Set 3: gender_v1_v2 ,AGE_GOLD, bmi_v1_v2,  income_v1_v2,education, relocation_age, background_5, generation   
+## covariate adjustment
+Set 3: gender_v1_v2 ,AGE_GOLD, bmi_v1_v2,  income_v1_v2,education, relocation_age, background_5, generation, AHEI   
 
 ## REgression function
 ```{r , echo=FALSE}
 
+
 reg.func<- function(reg.results){
 
-  reg.results %>%
-   map(confint, c( '.x')) ->m1.cis
-  
-m1.cis2<-  as.data.frame(do.call(rbind, m1.cis)) %>%
-    rownames_to_column('alpha')%>%
-  mutate(OR.LCL=exp(`2.5 %`),OR.UCL=exp(`97.5 %`))%>%
-  dplyr::select(-`2.5 %`, -`97.5 %`)
-
-
+   #reg.results<- reg.1
 reg.results%>%
   map(summary) %>%
   map(coef) -> m1.sum
+reg.results%>%
+  map(confint) -> m1.ci
 
+m1.ci2<- as.data.frame(do.call(rbind, m1.ci)) %>%
+  mutate(cov=rep(row.names(m1.ci$shannon_s), 4)) %>%
+    remove_rownames()%>%
+ mutate(alpha=rep(names(m1.ci), each=nrow(m1.ci$shannon_s))) %>%
+  dplyr::filter(cov %in% c('asthma.current:bmi_v1_v2','asthma.current:obese',  'bmi_v1_v2', 'asthma.current','obese'))
+ 
 m1.sum2<- as.data.frame(do.call(rbind, m1.sum)) %>%
   mutate(cov=rep(row.names(m1.sum$shannon_s), 4)) %>%
-    remove_rownames() %>%
-  dplyr::filter(cov=='.x')%>%
-  dplyr::select(-cov)%>%
-  mutate(alpha=names(m1.sum), OR=exp(Estimate))
+    remove_rownames()%>%
+  mutate(alpha=rep(names(m1.sum), each=nrow(m1.sum$shannon_s))) %>%
+  dplyr::filter(cov %in% c('asthma.current:bmi_v1_v2','asthma.current:obese', 'bmi_v1_v2', 'asthma.current','obese'))%>%
+  dplyr::inner_join(m1.ci2, by=c('cov'='cov', 'alpha'='alpha'))
+  #dplyr::select(-cov)%>%
+  # mutate(alpha=rep(names(m1.sum), each=3))
 results.to.return<- m1.sum2 %>%
-  left_join(m1.cis2 ,
-     by=c('alpha'))%>%
   mutate( alpha=factor(alpha, lev=c( "observed_features_s",       "evenness_s" ,"shannon_s"   ,         "faith_pd_s"),
                                                   labels = c("Observed features",       "Evenness" ,"Shannon"   ,         "Faith's PD")))%>%
   arrange(alpha)%>%
-  dplyr::select(alpha, Estimate, `Std. Error`, `z value`, `Pr(>|z|)`, OR,OR.LCL,OR.UCL)%>%
-  dplyr::rename(SE= `Std. Error`,Z=`z value`, p.value=`Pr(>|z|)`)
+  relocate(alpha)%>%
+  #dplyr::select(alpha, Estimate, `Std. Error`, `z value`, `Pr(>|z|)`)%>%
+  dplyr::rename(SE= `Std. Error`,t=`t value`, p.value=`Pr(>|t|)`, LCL='2.5 %', UCL='97.5 %')
 
 return(results.to.return)
 }
+
 
 ```
 
@@ -84,181 +85,45 @@ alpha<- c('shannon_s','evenness_s', 'faith_pd_s', 'observed_features_s')
 
 ```{r , echo=FALSE}
 
-regs.1.current <- alpha.gold %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.gold))
 
-regs.2.current <- alpha.gold %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.gold))
-regs.3.current <- alpha.gold %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.gold))
 
 
+map_regs_hei_int_bmi<- function(df) {
+#df<- alpha.gold  
+reg.4<-  df %>%
+    dplyr::select(one_of(alpha)) %>%  
+    map(~ lm(.x~asthma.current+bmi_v1_v2+ asthma.current*bmi_v1_v2+gender_v1_v2 +AGE_GOLD +income+education +relocation_age +generation+smoker.current.v1.v2+total+ AHEI2010, data = df))    
 
 
+mod4.res<- reg.func(reg.4)
 
-results.1.current<- reg.func(regs.1.current)
+return(list(reg4=reg.4,mod4=mod4.res))
+}
 
-results.2.current<- reg.func(regs.2.current)
+map_regs_hei_int<- function(df) {
+#df<- alpha.gold  
+reg.4<-  df %>%
+    dplyr::select(one_of(alpha)) %>%  
+    map(~ lm(.x~asthma.current+obese+ asthma.current*obese+gender_v1_v2 +AGE_GOLD +income+education +relocation_age +generation+smoker.current.v1.v2+total+ AHEI2010, data = df))    
 
-results.3.current<- reg.func(regs.3.current)
 
+mod4.res<- reg.func(reg.4)
 
-```
+return(list(reg4=reg.4,mod4=mod4.res))
+}
 
 
 
+map_regs_hei_as<- function(df) {
+# df<- alpha.gold  
+reg.4<-  df %>%
+    dplyr::select(one_of(alpha)) %>%  
+    map(~ lm(.x~asthma.current+obese+gender_v1_v2 +AGE_GOLD +income+education +relocation_age +generation+smoker.current.v1.v2+total+ AHEI2010, data = df))    
 
-```{r , echo=FALSE}
+mod4.res<- reg.func(reg.4)
 
-
-
-res.regs.current<- data.frame(Model=rep(c(1,2,3), each=4),
-                         covs=rep(c('gender_v1_v2, AGE_GOLD, current smoking','gender_v1_v2, AGE_GOLD, income, education, current smoking','gender_v1_v2, AGE_GOLD, income, education, relocation_age, background_5, generation, current smoking'  ), each=4),
-                         bind_rows(results.1.current,results.2.current,results.3.current )
-  
-)%>%
-  arrange(alpha, Model) %>%
-  mutate(outcome='Current Asthma') 
-
-```
-
-
-
-##OA
-
-```{r , echo=FALSE}
-table(alpha.gold$asthma.current.obese)
-alpha.OA<- alpha.gold %>%
-  dplyr::filter(asthma.current.obese %in% c('Neither','Obese asthma'))
-regs.1.OA <- alpha.OA%>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.OA))
-
-regs.2.OA <- alpha.OA %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.OA))
-regs.3.OA <- alpha.OA %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.OA))
-
-
-
-
-
-results.1.OA<- reg.func(regs.1.OA)
-
-results.2.OA<- reg.func(regs.2.OA)
-
-results.3.OA<- reg.func(regs.3.OA)
-
-
-```
-
-
-##Obese only
-
-```{r , echo=FALSE}
-table(alpha.gold$asthma.current.obese)
-
-
-alpha.Ob<- alpha.gold %>%
-  dplyr::filter(asthma.current.obese %in% c('Neither','Obese only'))
-regs.1.Ob <- alpha.Ob%>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.Ob))
-
-regs.2.Ob <- alpha.Ob %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.Ob))
-regs.3.Ob <- alpha.Ob %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(obese~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.Ob))
-
-
-
-
-
-results.1.Ob<- reg.func(regs.1.Ob)
-
-results.2.Ob<- reg.func(regs.2.Ob)
-
-results.3.Ob<- reg.func(regs.3.Ob)
-
-
-```
-
-
-
-##Asthma only
-
-```{r , echo=FALSE}
-table(alpha.gold$asthma.current.obese)
-
-
-alpha.As<- alpha.gold %>%
-  dplyr::filter(asthma.current.obese %in% c('Neither','Asthma only'))
-regs.1.As <- alpha.As%>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +smoker.current.v1.v2,family='binomial', data=alpha.As))
-
-regs.2.As <- alpha.As %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +smoker.current.v1.v2,family='binomial', data=alpha.As))
-regs.3.As <- alpha.As %>%
-  dplyr::select(one_of(alpha)) %>%
-  map(~glm(asthma.current~.x+gender_v1_v2 +AGE_GOLD +income+education +relocation_age+background_5 +generation+smoker.current.v1.v2,family='binomial', data=alpha.As))
-
-
-
-
-
-results.1.As<- reg.func(regs.1.As)
-
-results.2.As<- reg.func(regs.2.As)
-
-results.3.As<- reg.func(regs.3.As)
-
-```
-
-
-```{r , echo=FALSE}
-
-results.As<- results.1.As %>%
-  mutate(Model=1) %>%
-  bind_rows(results.2.As %>%
-  mutate(Model=2) )%>%
-  
-  bind_rows(results.3.As %>%
-  mutate(Model=3) ) %>%
-  mutate(asthma.current.obese='Asthma only') %>%
-  mutate(subset='asthma only & Neither') %>%
-  mutate(n=nrow(alpha.As))
-
-results.Ob<- results.1.Ob %>%
-  mutate(Model=1) %>%
-  bind_rows(results.2.Ob %>%
-  mutate(Model=2) )%>%
-  
-  bind_rows(results.3.Ob %>%
-  mutate(Model=3) ) %>%
-  mutate(asthma.current.obese='Obese only') %>%
-  mutate(subset='Obese only & Neither')%>%
-  mutate(n=nrow(alpha.Ob))
-
-
-
-results.OA<- results.1.OA %>%
-  mutate(Model=1) %>%
-  bind_rows(results.2.OA %>%
-  mutate(Model=2) )%>%
-  bind_rows(results.3.OA %>%
-  mutate(Model=3) ) %>%
-  mutate(asthma.current.obese='Obese asthma') %>%
-  mutate(subset='Obese asthma & Neither')%>%
-  mutate(n=nrow(alpha.OA))
+return(list(rreg4=reg.4,mod4=mod4.res))
+}
 
 ```
 
@@ -266,22 +131,18 @@ results.OA<- results.1.OA %>%
 
 ```{r , echo=FALSE}
 
-results.c<- data.frame( bind_rows(results.1.current%>%
-  mutate(Model=1)  ,results.2.current%>%
-  mutate(Model=2)  
-  ,results.3.current%>%
-  mutate(Model=3) )  )%>%
-  arrange(alpha,  Model)%>%
-  mutate(asthma.current.obese='Current Asthma')
+regs.hei.int<- map_regs_hei_int(alpha.gold)
+regs.hei.as.ob<- map_regs_hei_as(alpha.gold)
+regs.hei.int.bmi<- map_regs_hei_int_bmi(alpha.gold)
+
+```
 
 
+```{r , echo=FALSE}
 
-results.multi<- data.frame( bind_rows(results.As,results.OA,results.Ob )
-  
-)%>%
-  arrange(asthma.current.obese, alpha, Model) %>%
-  bind_rows(results.c %>% mutate(n=2404))
-
+res.all<- bind_rows(regs.hei.int.bmi$mod4 %>% mutate(Model='Int_BMI',exposure="asthma+bmi+asthma*bmi"),
+                    regs.hei.int$mod4 %>% mutate(Model='Int',exposure="asthma+obese+asthma*obese"),
+                    regs.hei.as.ob$mod4 %>% mutate(Model='Main',exposure="asthma+obese") )
 
 
 
@@ -290,6 +151,9 @@ results.multi<- data.frame( bind_rows(results.As,results.OA,results.Ob )
 
 
 
+
 ```{r , echo=FALSE}
-fwrite(results.multi, file='Alpha_asthma_logistic.csv')
+fwrite(res.all
+,file='/Users/stanislm/Documents/BIPM/BioDataCatalyst/Output/Nature_Comms/Alpha_div_diet.csv')
+
 ```
