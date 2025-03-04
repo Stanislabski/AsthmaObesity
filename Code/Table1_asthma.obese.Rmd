@@ -32,13 +32,16 @@ load( file='BDC-SOL-GOLD-0424.RData')
 ```{r , include=F}
 
 
-listVar.gold<- c( 'age_v1_v2',"gender_v1_v2", 'background_5',  'relocation_age', 'generation2','education_v1_v2','income_v1_v2','bmi_v1_v2', 'bmi_cat_v1_v2',"smoker.current.v1.v2","asthma.current.obese", "asthma.child.onset12" , 'prs.std.wang')
+listVar.gold<- c( 'age_v1_v2',"gender_v1_v2", 'background_5',  'relocation_age', 'generation2','education_v1_v2','income_v1_v2', 
+                  'AHEI2010',
+                  'bmi_v1_v2', 'bmi_cat_v1_v2',"smoker.current.v1.v2","asthma.current.obese", "asthma.child.onset12" , 'prs.std.wang')
 catVars.gold <- c("gender_v1_v2", 'background_5',  'generation2','education_v1_v2','income_v1_v2', 'bmi_cat_v1_v2',"smoker.current.v1.v2",
                             "asthma.current.obese", "asthma.child.onset12" )
  
 labels.gold<- c( 'Current asthma','Age',"Sex", 'National background', 'Immigration age',
-                 'Generation','Education','Income', 'BMI',
+                 'Generation','Education','Income','Alternate Healthy Eating Index', 'BMI',
                 'BMI category', 'Current smoker',      'Asthma/obesity', 'Child onset asthma','Asthma PRS')
+
 
 table1.vars.gold<- dplyr::select(gold,asthma.current,one_of(listVar.gold))
 labelled::var_label(table1.vars.gold) <-labels.gold
