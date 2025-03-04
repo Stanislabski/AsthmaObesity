@@ -1,0 +1,76 @@
+---
+title: "Beta Diversity Analysis"
+author: "MS"
+date: "4/21/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r , include=F}
+library(data.table)
+library(dplyr)
+library(tidyverse)
+library(vegan)
+library(tibble)
+  library(tidyr)
+library(GUniFrac)
+
+```
+
+```{r, include=F}
+load('/Users/stanislm/Documents/BIPM/BioDataCatalyst/Data/Aitchison.dm.RData')
+
+load( '/Users/stanislm/Documents/BIPM/BioDataCatalyst/Data/BDC-SOL-GOLD-12032021.RData')
+```
+
+
+
+
+
+
+
+
+```{r }
+
+(asthma.ait3.Ob.int<-  GUniFrac::adonis3(dm.sub~
+                                    gm.dat$gender_v1_v2+gm.dat$AGE_GOLD+gm.dat$smoker.current.v1.v2+gm.dat$income+gm.dat$education+gm.dat$relocation_age+gm.dat$generation+         gm.dat$AHEI2010+                         
+gm.dat$asthma.current +gm.dat$obese+gm.dat$asthma.current *gm.dat$obese))$aov.tab
+
+
+(asthma.ait3.As<- adonis3(dm.sub~ gm.dat$gender_v1_v2+gm.dat$AGE_GOLD+gm.dat$smoker.current.v1.v2+gm.dat$income+gm.dat$education+gm.dat$relocation_age+gm.dat$generation+
+                               gm.dat$AHEI2010+
+                               gm.dat$asthma.current ))$aov.tab
+
+
+(asthma.ait3.Ob.As<- adonis3(dm.sub~ gm.dat$gender_v1_v2+gm.dat$AGE_GOLD+gm.dat$smoker.current.v1.v2+gm.dat$income+gm.dat$education+gm.dat$relocation_age+gm.dat$generation+
+                               gm.dat$AHEI2010+
+                               gm.dat$obese+
+                               gm.dat$asthma.current ))$aov.tab
+
+(asthma.ait3.As.Ob<- adonis3(dm.sub~ gm.dat$gender_v1_v2+gm.dat$AGE_GOLD+gm.dat$smoker.current.v1.v2+gm.dat$income+gm.dat$education+gm.dat$relocation_age+gm.dat$generation+gm.dat$AHEI2010+
+                               gm.dat$asthma.current +gm.dat$obese))$aov.tab
+```
+
+
+
+```{r }
+beta<- 
+  data.frame(Model=rep(c('Int','Main_asthmaonly','Main_asthma','Main_obese'), 1), 
+              rbind(
+              asthma.ait3.Ob.int$aov.tab['gm.dat$asthma.current:gm.dat$obese',],
+              asthma.ait3.As$aov.tab['gm.dat$asthma.current',],
+                   asthma.ait3.Ob.As$aov.tab['gm.dat$asthma.current',],
+                   asthma.ait3.As.Ob$aov.tab['gm.dat$obese',]))
+
+
+
+```
+
+```{r saving data , include=F}
+fwrite(beta,file='/Users/stanislm/Documents/BIPM/BioDataCatalyst/Output/Nature_Comms/beta_asthma_diet_0225.csv')
+
+```
