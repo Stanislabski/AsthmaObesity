@@ -1,0 +1,123 @@
+---
+title: "ENET to predict microbial predictors of asthma"
+author: "MS"
+date: "11/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(plyr)
+library(dplyr)
+library(knitr)
+library(grid)
+library(ggplot2)
+library(gridExtra)
+library(tibble)
+# library(selbal)
+# library(zCompositions)
+#BiocManager::install("Biostrings")
+library(mia)
+library(phyloseq)
+# library(microbiome) 
+library(glmnet)
+library(pROC)
+sessionInfo()
+library(MLeval )
+
+```
+
+
+
+```{r , echo=F}
+
+load(file='data.test.ancom.sp.RData') 
+
+load( file='data.train.ancom.sp.RData') 
+
+```
+
+
+
+
+
+```{r , echo=F}
+  
+covs.all<- c('male','AGE_GOLD','income','education', 'relocation_age', 'other', 'Dominican', 'Cuban', 'PuertoRican', 'generation','smoker.current.v1.v2','AHEI2010')
+
+d.all<- ancom.sp.train%>% 
+  dplyr::select(one_of(covs.all),obese,starts_with('OTU') , starts_with('s.'))
+
+
+test.all<- ancom.sp.test %>%
+  dplyr::select(obese,one_of(names(d.all)))
+```
+
+
+
+```{r , echo=F}     
+
+outcome<- ancom.sp.train$asthma.current
+
+# table(ancom.selbal.g.train.std$asthma.current)
+ penalty.factor.all=c(  rep(0, length(covs.all)),rep(1, (ncol(d.all)-length(covs.all))))
+
+  cv_model.all<- cv.glmnet(as.matrix(d.all), outcome, alpha = .5, family='binomial')
+  best_model.all <- glmnet(as.matrix(d.all), outcome, alpha = .5, lambda =  cv_model.all$lambda.1se, family='binomial')
+  coef.tokeep.all<- coef(best_model.all)[,1]!=0
+  names(coef.tokeep.all[coef.tokeep.all==T])[-1]
+  
+  tokeep.all.sp<-  setdiff( names(coef.tokeep.all[coef.tokeep.all==T])[-1],c(covs.all,'obese'))
+  tokeep.all.sp
+
+
+```
+
+
+
+```{r}
+  # hist(glm_test_all)
+
+best_model.all$beta
+
+best_model.all$beta[1:13]<- 0
+
+glm_test_all <- predict(best_model.all, s = cv_model.all$lambda.1se, newx =as.matrix(test.all))
+
+
+
+tokeep.all.sp
+
+
+(auc.all<- pROC::auc(ancom.sp.test$asthma.current, glm_test_all))
+
+ancom.sp.test$score_all<- glm_test_all
+
+
+```
+
+
+
+
+
+
+```{r , echo=F}
+
+
+betas.all<- data.frame(enet=row.names(best_model.all$beta), beta=best_model.all$beta[,1])%>%
+  dplyr::left_join(otus.holm.sp %>% dplyr::select(-prev, -rel.abun) , by=c('enet'='OTU'))%>%
+  dplyr::filter(beta !=0)
+
+
+betas<- list(enet.all=betas.all)
+
+
+
+```
+
+```{r , echo=F}
+
+save(betas,
+     file='/Users/stanislm/Documents/BIPM/BioDataCatalyst/Output/Nature_Comms/Parsimonious/enet.scores.test.0125.RData') 
+```
+
