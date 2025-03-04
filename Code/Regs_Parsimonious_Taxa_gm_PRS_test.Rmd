@@ -43,8 +43,8 @@ source('Functions_for_Regs_Taxa_gm_LASSO_PRS.R')
 
 
 ### The plan
-I think we want to build the model up from most basic to most complex.  The plot would have different facets for Model 1-3, and different line color for omic measure (i think) - PRS, alpha, taxa.  
-Ethan thinks the most basic model starts with age, sex, PCs, but from GM perspective, we are interested in what genetics adds to GM data.  So I think will do it both ways.
+I think we want to build the model up from most basic to most complex.  
+Ethan thinks the most basic model starts with age, sex, PCs.  We are also interested in what genetics adds to GM data, so we will do it both ways.
 
 Here are the steps:
 0. covs
@@ -60,7 +60,7 @@ Here are the steps for the starting with PCs (pc):
 ```{r , echo=FALSE}
 
 m1.otu<- 'score.all'
-covs.m1<- c('male','AGE_GOLD','income','education', 'relocation_age', 'other', 'Dominican', 'Cuban', 'PuertoRican', 'generation','smoker.current.v1.v2', 'PC1', 'PC2','PC3','PC4','PC5')
+covs.m1<- c('male','AGE_GOLD','income','education', 'relocation_age', 'other', 'Dominican', 'Cuban', 'PuertoRican', 'generation','smoker.current.v1.v2', 'AHEI2010','PC1', 'PC2','PC3','PC4','PC5')
 step.overall<- steps.func(ancom.selbal.g.test, m1.otu, covs=covs.m1, ancom.selbal.g.test$asthma.current)
 
 
@@ -94,27 +94,9 @@ overall.pc.res$p.add.prs
 
 
 
-## Levels of covariate adjustment
-Set 1: gender_v1_v2 ,AGE_GOLD, smoking 
-Set 2: gender_v1_v2 ,AGE_GOLD,  income,education_v1_v2  , smoking
-Set 3: gender_v1_v2 ,AGE_GOLD,  income,education_v1_v2, relocation_age, background, generation , smoking  
+## covariate adjustment
+Set 3: gender_v1_v2 ,AGE_GOLD,  income,education_v1_v2, relocation_age, background, generation , smoking  , HEI
 
-## Minimally adjusted models
-
-
-### The plan
-I think we want to build the model up from most basic to most complex.  
-Ethan thinks the most basic model starts with age, sex, PCs, but from GM perspective, we are also interested in what genetics adds to GM data.  So I think will do it both ways.
-
-Here are the steps:
-0. age, sex, smoking, PCS
-1. age, sex,  smoking, omic
-2. age, sex, smoking,  omic, PRS, PCs
-
-Here are the steps for the starting with PCs (pc):
-0. age, sex, PCs
-1. age, sex, PCs, PRS
-2. age, sex, PCs, PRS, omic
 
 
 ```{r , echo=FALSE}
